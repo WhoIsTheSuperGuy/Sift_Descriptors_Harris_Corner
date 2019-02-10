@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import math
 from scipy.ndimage import maximum_filter
+import matplotlib.pyplot as plt
 np.seterr(divide='ignore', invalid='ignore')
 
 
@@ -120,6 +121,8 @@ def SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1):
 	finalFirst=[]
 	finalSecond=[]
 	ratioTest=[]
+	dmatch=[]
+	tempIndex=0
 	#print(len(tempTuple),firstarray.shape,len(tempTuple1),secondarray.shape)
 	for k in tempTuple:
 		j=0
@@ -130,14 +133,16 @@ def SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1):
 				min=tt
 				innerPointX=y[0]
 				innerPointY=y[1]
+				tempIndex=j
 			j=j+1
 			#print (min)
+		dmatch.append(cv2.DMatch(i,tempIndex,min))
 		ratioTest.append(min/secondMin)
 		finalList.append(min)
 		finalFirst.append((k[0],k[1]))
 		finalSecond.append((innerPointX,innerPointY))
 		i=i+1
-	return finalList,finalFirst,finalSecond
+	return finalList,finalFirst,finalSecond,ratioTest,dmatch
 	
 '''
 Getting the Second Input Image Detecting Harris Corner 
@@ -147,24 +152,37 @@ Output:Result
 def harrisCornerDetection(imgo):
 	imgraw=input("Second Input\n")
 	secondImg1=cv2.imread(imgraw)
+	
+	## Getitng Gray Scale images  for Images
 	img,height,width=getGrayImage(imgo)
 	secondImg,secondHeight,secondwidth=getGrayImage(secondImg1)
+	
+	##Getting Gradients
 	dy,dx,Ixx,Iyy,Ixy=gradient_gaussian(img)
 	dy2,dx2,Ixx2,Iyy2,Ixy2=gradient_gaussian(secondImg)
+	
+	##Threoshold
 	thres=0.2
-	windowsize=3
-	rmax=0
+	
+	##Drawing Keypoints on two Images
 	color_img=imgo.copy()
 	color_img2=secondImg1.copy()
-	#hog_image=imgo.copy()
+	
+	
+	#Response Matrix
 	R=response_matrixx(Ixx,Iyy,Ixy)
 	R1=response_matrixx(Ixx2,Iyy2,Ixy2)
-	firstImgMax=maximumRValue(R)
-	secondImgMax=maximumRValue(R1)
+	
+	#Non Maximum Supression 
 	R=maxSupression(R)
 	R1=maxSupression(R1)
-	tempTuple,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)
-		
+	
+	##Getting Maximum Value of R
+	firstImgMax=maximumRValue(R)
+	secondImgMax=maximumRValue(R1)
+	
+	##Displaying Images with keypoints
+	tempTuple,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)	
 	vis = np.concatenate((imgo, color_img), axis=1)
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
@@ -175,18 +193,26 @@ def harrisCornerDetection(imgo):
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows();
+	
+	
+	#Getting Descriptors
 	desDict = {}
 	desDict1 = {}
-	
-	arr = img.astype(np.float64)
-	arr2=secondImg.astype(np.float64)
+	arr = img.astype(np.float32)
+	arr2=secondImg.astype(np.float32)
 	for q in tempTuple:		
 		desDict[(q[0],q[1])]=getdescriptor(arr,q[0],q[1])
 		
 	for e in tempTuple1:
 		desDict1[(e[0],e[1])]=getdescriptor(arr2,e[0],e[1])
 		
-
+	
+	#calculating the matches
+	finalList=[]
+	finalfirst=[]
+	finalsecond=[]
+	ratioTest=[]
+	matches=[]
 	if desDict=={} or desDict1=={}:
 		return False
 	else:
@@ -196,7 +222,36 @@ def harrisCornerDetection(imgo):
 		secondarray = secondarray / np.linalg.norm(secondarray)
 		firstarray=np.clip(firstarray,0,0.2)
 		secondarray=np.clip(secondarray,0,0.2)
-		finalList,finalfirst,finalsecond=SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1)
+		finalList,finalfirst,finalsecond,ratioTest,matches=SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1)
+	
+	#Making Keypoint list using CV2.keypoint
+	KeypointsImg1=[]
+	KeypointsImg2=[]
+	for key in tempTuple:
+		KeypointsImg1.append(cv2.KeyPoint(key[0],key[1],1))
+	
+	for key in tempTuple1:
+		KeypointsImg2.append(cv2.KeyPoint(key[0],key[1],1))
+		
+	
+	print(firstarray.shape)
+	print(secondarray.shape)
+	#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+	#matches = bf.match(secondarray,firstarray)
+	outi=cv2.imread('Yosemite1.jpg',0)  
+	outs=cv2.imread('Yosemite2.jpg',0) 
+	outimage=img
+	#matches = sorted(matches, key = lambda x:x.distance)
+	outimage = cv2.drawMatches(outi,KeypointsImg1,outs,KeypointsImg2,matches[:10],outImg=outimage, flags=2)
+	#plt.imshow((outimage).astype(np.uint8)),plt.show()
+	cv2.imshow("Test",outimage)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows();
+	
+	
+	
+	#cv2.drawMatches(img,matchpointsImg1,secondImg,matchpointsImg2,matches,FinalImage)
+	
 			
 '''
 Gettting the Descriptors for the Following keypoints
@@ -206,22 +261,22 @@ Output:Descriptor
 def getdescriptor(imarr,i,j):
 	#print("Hello")
 	vec = [0]*16
-	vec[0] = localdir(i-8,j-8,imarr)
-	vec[1] = localdir(i-8,j-4,imarr)
-	vec[2] = localdir(i-4,j-8,imarr)
-	vec[3] = localdir(i-4,j-4,imarr)
-	vec[4] = localdir(i-8,j,imarr)
-	vec[5] = localdir(i-8,j+4,imarr)
-	vec[6] = localdir(i-4,j,imarr)
-	vec[7] = localdir(i-4,j+4,imarr)
-	vec[8] = localdir(i,j-8,imarr)
-	vec[9] = localdir(i,j-4,imarr)
-	vec[10] = localdir(i,j,imarr)
-	vec[11] = localdir(i,j+4,imarr)
-	vec[12] = localdir(i+4,j-8,imarr)
-	vec[13] = localdir(i+4,j-4,imarr)
-	vec[14] = localdir(i+4,j,imarr)
-	vec[15] = localdir(i+4,j+4,imarr)
+	vec[0] = binsContainer(i-8,j-8,imarr)
+	vec[1] = binsContainer(i-8,j-4,imarr)
+	vec[2] = binsContainer(i-4,j-8,imarr)
+	vec[3] = binsContainer(i-4,j-4,imarr)
+	vec[4] = binsContainer(i-8,j,imarr)
+	vec[5] = binsContainer(i-8,j+4,imarr)
+	vec[6] = binsContainer(i-4,j,imarr)
+	vec[7] = binsContainer(i-4,j+4,imarr)
+	vec[8] = binsContainer(i,j-8,imarr)
+	vec[9] = binsContainer(i,j-4,imarr)
+	vec[10] = binsContainer(i,j,imarr)
+	vec[11] = binsContainer(i,j+4,imarr)
+	vec[12] = binsContainer(i+4,j-8,imarr)
+	vec[13] = binsContainer(i+4,j-4,imarr)
+	vec[14] = binsContainer(i+4,j,imarr)
+	vec[15] = binsContainer(i+4,j+4,imarr)
 	
 	return [val for subl in vec for val in subl]
 
@@ -237,8 +292,8 @@ def direction(i,j,imarr):
 		#if i<470 and j<630:
 		mij = math.sqrt((imarr[i+1,j]-imarr[i-1,j])**2 
 				+(imarr[i,j+1]-imarr[i,j-1])**2)
-		theta = math.atan((imarr[i,j+1]-imarr[i,j-1])
-				/(imarr[i+1,j]-imarr[i-1,j]))
+		theta = math.degrees(math.atan2((imarr[i,j+1]-imarr[i,j-1])
+				,(imarr[i+1,j]-imarr[i-1,j])))
 
 		return mij,theta
 
@@ -248,15 +303,14 @@ Getitng the patch around the Keypoints and creating Bins
 Input:x,y,Img
 Output:Bins for the particular Cell
 '''	
-def localdir(i,j,imarr):
+def binsContainer(i,j,imarr):
 	#print(i,j)
-	P = math.pi
 	localDir = [0]*8
 
 	for b in range(i,i+4):
 		for c in range(j,j+4):
 			m,t = direction(b,c,imarr)
-			t=math.degrees(t)
+			#t=math.degrees(t)
 			#print(t)
 			if t>=0 and t<=45:
 				localDir[0]+=m
