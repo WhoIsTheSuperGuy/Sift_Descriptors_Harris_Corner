@@ -5,7 +5,11 @@ from scipy.ndimage import maximum_filter
 np.seterr(divide='ignore', invalid='ignore')
 
 
-
+'''
+Getting the GrayScale Image After Reading \
+Input:Image
+Output:Gray Image,Height,
+'''
 def getGrayImage(img):
 	img=np.float32(img)
 	img=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -13,6 +17,11 @@ def getGrayImage(img):
 	width=img.shape[1]
 	return img,height,width
 	
+'''
+Calculating the Gradient and GaussianBlur
+Input:GrayScale
+Output:GradientX,GradientY,SquareX,SquareY,XY
+'''
 def gradient_gaussian(img):
 	dy,dx=np.gradient(img)
 	Ixx=dx**2;
@@ -23,24 +32,44 @@ def gradient_gaussian(img):
 	Ixy=cv2.GaussianBlur(Ixy,(3,3),2)
 	return dy,dx,Ixx,Iyy,Ixy
 	
+'''
+Getting the harris response Matrix
+Input:SquareX,Squarey,Xy
+output:Response matrix
+'''
 def response_matrixx(Ixx,Iyy,Ixy):
 	det= (Ixx*Iyy)-(Ixy**2)
 	trace= Ixx+Iyy
 	R=det/trace
 	return R
 
+'''
+Getting the maximum value in the Response Matrix
+input:Response Matrix
+output: Maximum Value
+'''	
 def maximumRValue(R):
 	map(max, R)
 	list(map(max, R))
 	maxim=max(map(max, R))
 	return maxim
 
+'''
+Max Supression Done on the Response Matrix
+Input:Response Matrix
+Output:Response Matrix with Max Supression
+'''	
 def maxSupression(R):
 	localmax=maximum_filter(R,size=3)
 	localFilter=R ==localmax
 	R=R * localFilter
 	return R
-	
+
+'''
+Calculating the Keypoints for the Img
+Input:Image,Height,Width,Response matrix,Threshold,Maximum Value,Color Image
+Output:Keypoints in the Image and red dot is being placed within rectangle around keypoints
+'''	
 def getKeypoints(img,height,width,R,thres,maxim,color_img):
 	tempTuple=[]
 	for y in range(0,height,2):
@@ -57,7 +86,11 @@ def getKeypoints(img,height,width,R,thres,maxim,color_img):
 	return tempTuple,color_img
 	
 	
-	
+'''
+Converting the Dictionary to NumpyArray
+Input:Key points for the image and Dictionary
+Output:Numpy Array of descriptors
+'''	
 def convertingDictToArray(tempTuple,desDicto):
 	temp=np.zeros((len(tempTuple),128))
 	i=0
@@ -71,8 +104,14 @@ def convertingDictToArray(tempTuple,desDicto):
 		i=i+1
 	return temp
 
+'''
+Calculating the SSDMeasure ,Ratio Test for each Key Point
+Input:First Descriptors,Second Descriptors,first Keypoints,Second Keypoints
+Output:finalList of minimum values,first Image key points,Second Image Keypoints
+'''	
 def SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1):
 	min=1
+	secondMin=2
 	i=0
 	j=0
 	innerPointX=0
@@ -80,24 +119,31 @@ def SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1):
 	finalList=[]
 	finalFirst=[]
 	finalSecond=[]
+	ratioTest=[]
 	#print(len(tempTuple),firstarray.shape,len(tempTuple1),secondarray.shape)
 	for k in tempTuple:
 		j=0
 		for y in tempTuple1:
 			tt=np.sum((firstarray[i]-secondarray[j])**2)
 			if tt<min:
+				secondMin=min
 				min=tt
 				innerPointX=y[0]
 				innerPointY=y[1]
 			j=j+1
 			#print (min)
+		ratioTest.append(min/secondMin)
 		finalList.append(min)
 		finalFirst.append((k[0],k[1]))
 		finalSecond.append((innerPointX,innerPointY))
 		i=i+1
 	return finalList,finalFirst,finalSecond
 	
-	
+'''
+Getting the Second Input Image Detecting Harris Corner 
+Input:Image
+Output:Result
+'''	
 def harrisCornerDetection(imgo):
 	imgraw=input("Second Input\n")
 	secondImg1=cv2.imread(imgraw)
@@ -152,7 +198,11 @@ def harrisCornerDetection(imgo):
 		secondarray=np.clip(secondarray,0,0.2)
 		finalList,finalfirst,finalsecond=SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1)
 			
-	
+'''
+Gettting the Descriptors for the Following keypoints
+Input:Image,x,y
+Output:Descriptor
+'''	
 def getdescriptor(imarr,i,j):
 	#print("Hello")
 	vec = [0]*16
@@ -175,7 +225,11 @@ def getdescriptor(imarr,i,j):
 	
 	return [val for subl in vec for val in subl]
 
-	
+'''
+Calculating Magnitutde and direction 
+Input:x,y,Img
+Output:Magnitude,Direction
+'''	
 def direction(i,j,imarr):
 		#print(imarr.shape)
 		mij=0
@@ -189,7 +243,11 @@ def direction(i,j,imarr):
 		return mij,theta
 
 	
-	
+'''
+Getitng the patch around the Keypoints and creating Bins
+Input:x,y,Img
+Output:Bins for the particular Cell
+'''	
 def localdir(i,j,imarr):
 	#print(i,j)
 	P = math.pi
@@ -218,7 +276,9 @@ def localdir(i,j,imarr):
 				localDir[7]+=m
 	return localDir
 
-	
+'''
+Main Function Takes the First input Image
+'''	
 if __name__=="__main__":
 	imgraw=input("imgage Input\n")
 	harrisCornerDetection(cv2.imread(imgraw))
