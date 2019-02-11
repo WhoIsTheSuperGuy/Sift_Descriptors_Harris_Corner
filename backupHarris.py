@@ -28,9 +28,9 @@ def gradient_gaussian(img):
 	Ixx=dx**2;
 	Iyy=dy**2
 	Ixy=dx*dy
-	Ixx=cv2.GaussianBlur(Ixx,(3,3),2)
-	Iyy=cv2.GaussianBlur(Iyy,(3,3),2)
-	Ixy=cv2.GaussianBlur(Ixy,(3,3),2)
+	Ixx=cv2.GaussianBlur(Ixx,(3,3),0)
+	Iyy=cv2.GaussianBlur(Iyy,(3,3),0)
+	Ixy=cv2.GaussianBlur(Ixy,(3,3),0)
 	return dy,dx,Ixx,Iyy,Ixy
 	
 '''
@@ -76,10 +76,8 @@ def getKeypoints(img,height,width,R,thres,maxim,color_img):
 	for y in range(0,height,2):
 		for x in range(0,width,2):
 			if(R[y,x]>(maxim*thres)):
-				if (y-8)<0 or (y+8)>img.shape[0] or (x-8)<0 or (x+8)>img.shape[1]:
-					continue
 				#finalimage[y,x]=r[y,x]
-				tempTuple.append((y,x))
+				tempTuple.append((x,y))
 				color_img.itemset((y,x,0),0)
 				color_img.itemset((y,x,1),0)
 				color_img.itemset((y,x,2),255)
@@ -93,56 +91,44 @@ Input:Key points for the image and Dictionary
 Output:Numpy Array of descriptors
 '''	
 def convertingDictToArray(tempTuple,desDicto):
-	temp=np.zeros((len(tempTuple),128))
+	#temp=np.zeros((len(tempTuple),128))
+	holymollyConvert=[]
 	i=0
 	desDict = desDicto
 	for p in tempTuple:
 		po=desDict[(p[0],p[1])]
-		j=0
-		for p in po:
-			temp[i][j]=p
-			j=j+1
-		i=i+1
-	return temp
+		holymollyConvert.append(po)
+	return np.array(holymollyConvert)
 
 '''
 Calculating the SSDMeasure ,Ratio Test for each Key Point
 Input:First Descriptors,Second Descriptors,first Keypoints,Second Keypoints
 Output:finalList of minimum values,first Image key points,Second Image Keypoints
 '''	
-def SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1):
-	min=1
-	secondMin=2
+def SSDMeasure(firstarray,secondarray,temptuple,temptuple1):
 	i=0
-	j=0
-	innerPointX=0
-	innerPointY=0
-	finalList=[]
-	finalFirst=[]
-	finalSecond=[]
+	threshold=0.9
 	ratioTest=[]
 	dmatch=[]
 	tempIndex=0
-	#print(len(tempTuple),firstarray.shape,len(tempTuple1),secondarray.shape)
-	for k in tempTuple:
-		j=0
-		for y in tempTuple1:
-			tt=np.sum((firstarray[i]-secondarray[j])**2)
-			if tt<min:
-				secondMin=min
-				min=tt
-				innerPointX=y[0]
-				innerPointY=y[1]
-				tempIndex=j
-			j=j+1
-			#print (min)
-		dmatch.append(cv2.DMatch(i,tempIndex,min))
-		ratioTest.append(min/secondMin)
-		finalList.append(min)
-		finalFirst.append((k[0],k[1]))
-		finalSecond.append((innerPointX,innerPointY))
+	diff=[]
+	minvalue=0
+	for k in firstarray:
+		diff=[]
+		minvalue=0
+		for y in secondarray:
+			tt=np.sum((k-y)**2)
+			diff.append(tt)
+			
+		diff=sorted(diff)
+		for op in diff:
+			if op>threshold:
+				minvalue=op
+				break
+		dmatch.append(cv2.DMatch(i,diff.index(minvalue),minvalue))
+		ratioTest.append(diff[0]/diff[1])
 		i=i+1
-	return finalList,finalFirst,finalSecond,ratioTest,dmatch
+	return ratioTest,dmatch
 	
 '''
 Getting the Second Input Image Detecting Harris Corner 
@@ -163,7 +149,6 @@ def harrisCornerDetection(imgo):
 	
 	##Threoshold
 	thres=0.2
-	
 	##Drawing Keypoints on two Images
 	color_img=imgo.copy()
 	color_img2=secondImg1.copy()
@@ -182,30 +167,47 @@ def harrisCornerDetection(imgo):
 	secondImgMax=maximumRValue(R1)
 	
 	##Displaying Images with keypoints
-	tempTuple,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)	
+	tempTuple2,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)
 	vis = np.concatenate((imgo, color_img), axis=1)
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows();
 	
-	tempTuple1,color_img2=getKeypoints(secondImg,secondHeight,secondwidth,R1,thres,secondImgMax,color_img2)
+	tempTuple3,color_img2=getKeypoints(secondImg,secondHeight,secondwidth,R1,thres,secondImgMax,color_img2)
 	vis = np.concatenate((secondImg1, color_img2), axis=1)
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows();
+	row,col=img.shape
+	tempTuple=[]
+	tempTuple1=[]
+	
+	for i in tempTuple2:
+		if((i[0]+10>row) or (i[0]-10<0) or (i[1]+10>col) or (i[1]-10<0)):
+			continue
+		#print(i[0],i[1])
+		tempTuple.append((i[0],i[1]))
+	
+	for i in tempTuple3:
+		if((i[0]+10>row) or (i[0]-10<0) or (i[1]+10>col) or (i[1]-10<0)):
+			continue
+		tempTuple1.append((i[0],i[1]))
+		
 	
 	
 	#Getting Descriptors
 	desDict = {}
 	desDict1 = {}
-	arr = img.astype(np.float32)
-	arr2=secondImg.astype(np.float32)
-	for q in tempTuple:		
-		desDict[(q[0],q[1])]=getdescriptor(arr,q[0],q[1])
-		
+	print("Calucalting Descriptors for First Image")
+	for q in tempTuple:
+		#print("desc",q[0],q[1])
+		desDict[(q[0],q[1])]=getdescriptor(img,q[0],q[1])
+	print("Number of Descriptors in first Image",len(desDict))
+	
+	print("Calucalting Descriptors for Second Image")
 	for e in tempTuple1:
-		desDict1[(e[0],e[1])]=getdescriptor(arr2,e[0],e[1])
-		
+		desDict1[(e[0],e[1])]=getdescriptor(secondImg,e[0],e[1])
+	print("Number of Descriptors in Second Image",len(desDict1))
 	
 	#calculating the matches
 	finalList=[]
@@ -218,31 +220,26 @@ def harrisCornerDetection(imgo):
 	else:
 		firstarray=convertingDictToArray(tempTuple,desDict) 
 		secondarray=convertingDictToArray(tempTuple1,desDict1)
-		firstarray = firstarray / np.linalg.norm(firstarray)
-		secondarray = secondarray / np.linalg.norm(secondarray)
 		firstarray=np.clip(firstarray,0,0.2)
 		secondarray=np.clip(secondarray,0,0.2)
-		finalList,finalfirst,finalsecond,ratioTest,matches=SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1)
+		#firstarray = firstarray / np.linalg.norm(firstarray)
+		#secondarray = secondarray / np.linalg.norm(secondarray)
+		ratioTest,matches=SSDMeasure(firstarray,secondarray,tempTuple,tempTuple1)
 	
+	img=img.astype(np.uint8)
+	secondImg=secondImg.astype(np.uint8)
 	#Making Keypoint list using CV2.keypoint
 	KeypointsImg1=[]
 	KeypointsImg2=[]
-	for key in tempTuple:
-		KeypointsImg1.append(cv2.KeyPoint(key[0],key[1],1))
+	for keyfir in tempTuple:
+		KeypointsImg1.append(cv2.KeyPoint(keyfir[0],keyfir[1],1))
 	
-	for key in tempTuple1:
-		KeypointsImg2.append(cv2.KeyPoint(key[0],key[1],1))
+	
+	for keysec in tempTuple1:
+		KeypointsImg2.append(cv2.KeyPoint(keysec[0],keysec[1],1))
 		
-	
-	print(firstarray.shape)
-	print(secondarray.shape)
-	#bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-	#matches = bf.match(secondarray,firstarray)
-	outi=cv2.imread('Yosemite1.jpg',0)  
-	outs=cv2.imread('Yosemite2.jpg',0) 
-	outimage=img
-	#matches = sorted(matches, key = lambda x:x.distance)
-	outimage = cv2.drawMatches(outi,KeypointsImg1,outs,KeypointsImg2,matches[:10],outImg=outimage, flags=2)
+	matches = sorted(matches, key = lambda x:x.distance)
+	outimage = cv2.drawMatches(img,KeypointsImg1,secondImg,KeypointsImg2,matches[:10],None, flags=2)
 	#plt.imshow((outimage).astype(np.uint8)),plt.show()
 	cv2.imshow("Test",outimage)
 	cv2.waitKey(0)
@@ -278,7 +275,11 @@ def getdescriptor(imarr,i,j):
 	vec[14] = binsContainer(i+4,j,imarr)
 	vec[15] = binsContainer(i+4,j+4,imarr)
 	
-	return [val for subl in vec for val in subl]
+	imx=[val for subl in vec for val in subl]
+	imx=np.array(imx)
+	imx=imx / np.linalg.norm(imx)
+	return imx
+	#return [val for subl in vec for val in subl]
 
 '''
 Calculating Magnitutde and direction 
@@ -286,14 +287,13 @@ Input:x,y,Img
 Output:Magnitude,Direction
 '''	
 def direction(i,j,imarr):
-		#print(imarr.shape)
+		#print("Gradient",i,j)
 		mij=0
 		theta=0
-		#if i<470 and j<630:
-		mij = math.sqrt((imarr[i+1,j]-imarr[i-1,j])**2 
+		mij = np.sqrt((imarr[i+1,j]-imarr[i-1,j])**2 
 				+(imarr[i,j+1]-imarr[i,j-1])**2)
-		theta = math.degrees(math.atan2((imarr[i,j+1]-imarr[i,j-1])
-				,(imarr[i+1,j]-imarr[i-1,j])))
+		theta = ((np.arctan2((imarr[i,j+1]-imarr[i,j-1])
+				,(imarr[i+1,j]-imarr[i-1,j])))*180/np.pi)%360
 
 		return mij,theta
 
@@ -305,30 +305,29 @@ Output:Bins for the particular Cell
 '''	
 def binsContainer(i,j,imarr):
 	#print(i,j)
-	localDir = [0]*8
-
+	bins = [0]*8
 	for b in range(i,i+4):
 		for c in range(j,j+4):
 			m,t = direction(b,c,imarr)
 			#t=math.degrees(t)
 			#print(t)
 			if t>=0 and t<=45:
-				localDir[0]+=m
+				bins[0]+=m
 			elif t>45 and t<=90:
-				localDir[1]+=m
+				bins[1]+=m
 			elif t>90 and t<=135:
-				localDir[2]+=m
-			elif t>135 and t<180:
-				localDir[3]+=m
-			elif t>-180 and t<=-135: 
-				localDir[4]+=m
-			elif t>-135 and t<=-90:
-				localDir[5]+=m
-			elif t>-90 and t<=-45:
-				localDir[6]+=m	
-			elif t>-45 and t<=0:
-				localDir[7]+=m
-	return localDir
+				bins[2]+=m
+			elif t>135 and t<=180:
+				bins[3]+=m
+			elif t>180 and t<=225: 
+				bins[4]+=m
+			elif t>225 and t<=270:
+				bins[5]+=m
+			elif t>270 and t<=315:
+				bins[6]+=m	
+			elif t>315 and t<=360:
+				bins[7]+=m
+	return bins
 
 '''
 Main Function Takes the First input Image
