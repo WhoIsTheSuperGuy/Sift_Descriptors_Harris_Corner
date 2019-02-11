@@ -1,5 +1,7 @@
 # Sift_Descriptors_Harris_Corner
 
+Part 1:
+
 Two Input Images are taken when Executing the program
 
 In first Part Calculating the Harris Corner Points:
@@ -30,10 +32,13 @@ These are done on the two images .
 Step 5:
 All the Reponse function which we get during the step 4 , maximum value is calculated in that matrix in maximumRValue() function.
 
+
 step 6:
 Then getting the keypoints that is greater than the (threshold*maximum Value in the R matrix) and storing all those points in one list with tuple
 And Drawing all the points accordingly on the image.
 Here you get two pop up first one is first image and then the next Image with all the keypoints displayed.
+
+Part 2:calculating the Descriptors fot The keypoints 
 
 Step 7:
 In these After getting all the keypoints I needed to remove those points that are nearer to the border as we might go out of the image while calculating the descriptors and all other equation.
