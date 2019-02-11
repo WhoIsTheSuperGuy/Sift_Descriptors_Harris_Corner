@@ -143,6 +143,8 @@ def harrisCornerDetection(imgo):
 	img,height,width=getGrayImage(imgo)
 	secondImg,secondHeight,secondwidth=getGrayImage(secondImg1)
 	
+	print("------------------------------------------------------------")
+	Print("Compute Harris matrix")
 	##Getting Gradients
 	dy,dx,Ixx,Iyy,Ixy=gradient_gaussian(img)
 	dy2,dx2,Ixx2,Iyy2,Ixy2=gradient_gaussian(secondImg)
@@ -158,6 +160,8 @@ def harrisCornerDetection(imgo):
 	R=response_matrixx(Ixx,Iyy,Ixy)
 	R1=response_matrixx(Ixx2,Iyy2,Ixy2)
 	
+	print("--------------------------------------------------")
+	print("Performing the Maximum Supression")
 	#Non Maximum Supression 
 	R=maxSupression(R)
 	R1=maxSupression(R1)
@@ -166,6 +170,8 @@ def harrisCornerDetection(imgo):
 	firstImgMax=maximumRValue(R)
 	secondImgMax=maximumRValue(R1)
 	
+	print("---------------------------------------------------")
+	print("Getting all the Keypoints from the image")
 	##Displaying Images with keypoints
 	tempTuple2,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)
 	vis = np.concatenate((imgo, color_img), axis=1)
@@ -333,6 +339,7 @@ def binsContainer(i,j,imarr):
 Main Function Takes the First input Image
 '''	
 if __name__=="__main__":
+	print("Starting the Main Function")
 	imgraw=input("imgage Input\n")
 	harrisCornerDetection(cv2.imread(imgraw))
 	
