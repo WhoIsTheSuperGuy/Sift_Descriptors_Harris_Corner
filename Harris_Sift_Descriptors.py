@@ -71,18 +71,55 @@ Calculating the Keypoints for the Img
 Input:Image,Height,Width,Response matrix,Threshold,Maximum Value,Color Image
 Output:Keypoints in the Image and red dot is being placed within rectangle around keypoints
 '''	
-def getKeypoints(img,height,width,R,thres,maxim,color_img):
+def getKeypoints(img,height,width,R,thres,maxim):
 	tempTuple=[]
-	for y in range(0,height,2):
-		for x in range(0,width,2):
-			if(R[y,x]>(maxim*thres)):
-				#finalimage[y,x]=r[y,x]
+	rows,cols=R.shape
+	for y in range(0,rows):
+		for x in range(0,cols):
+			if(R[y,x]>0):
 				tempTuple.append((x,y))
-				color_img.itemset((y,x,0),0)
-				color_img.itemset((y,x,1),0)
-				color_img.itemset((y,x,2),255)
-				cv2.rectangle(color_img,(x-2,y-2),(x+2,y+2),255,1)
-	return tempTuple,color_img
+	return tempTuple
+	
+def visualizing(img,tupletemp):
+	for i in tupletemp:
+		y=i[1]
+		x=i[0]
+		img.itemset((y,x,0),0)
+		img.itemset((y,x,1),0)
+		img.itemset((y,x,2),255)
+		cv2.rectangle(img,(x-2,y-2),(x+2,y+2),255,1)
+	return img
+
+'''
+Adaptive Maximum Supression
+'''
+def AdapativeMeasure(harris_response, corner_points, n):
+    R = []
+    responses = harris_response[corner_points[0], corner_points[1]]
+    corner_points = np.hstack((corner_points[0][:, None], corner_points[1][:, None]))
+    
+    for (i, (y, x)) in enumerate(corner_points):
+        bigger_neighbors = corner_points[responses > responses[i]]
+        
+        if bigger_neighbors.shape[0] == 0:
+            radius = np.inf
+        else:
+            radius = np.sum((bigger_neighbors - np.array([y, x]))**2, 1)
+            radius = radius.min()
+        R.append(radius)
+    
+    n = min(len(R), n)
+    p = np.argpartition(-np.asarray(R), n)[:n]
+	
+    z = corner_points[p]
+    out_c = []
+	
+    for el in z:
+       x = [el[1], el[0]]
+       out_c.append(x)
+
+    return out_c
+	
 	
 	
 '''
@@ -107,7 +144,7 @@ Output:finalList of minimum values,first Image key points,Second Image Keypoints
 '''	
 def SSDMeasure(firstarray,secondarray,temptuple,temptuple1):
 	i=0
-	threshold=0.9
+	threshold=0.7
 	ratioTest=[]
 	dmatch=[]
 	tempIndex=0
@@ -130,6 +167,7 @@ def SSDMeasure(firstarray,secondarray,temptuple,temptuple1):
 		i=i+1
 	return ratioTest,dmatch
 	
+	
 '''
 Getting the Second Input Image Detecting Harris Corner 
 Input:Image
@@ -143,14 +181,12 @@ def harrisCornerDetection(imgo):
 	img,height,width=getGrayImage(imgo)
 	secondImg,secondHeight,secondwidth=getGrayImage(secondImg1)
 	
-	print("------------------------------------------------------------")
-	Print("Compute Harris matrix")
 	##Getting Gradients
 	dy,dx,Ixx,Iyy,Ixy=gradient_gaussian(img)
 	dy2,dx2,Ixx2,Iyy2,Ixy2=gradient_gaussian(secondImg)
 	
 	##Threoshold
-	thres=0.2
+	thres=0.4
 	##Drawing Keypoints on two Images
 	color_img=imgo.copy()
 	color_img2=secondImg1.copy()
@@ -159,27 +195,39 @@ def harrisCornerDetection(imgo):
 	#Response Matrix
 	R=response_matrixx(Ixx,Iyy,Ixy)
 	R1=response_matrixx(Ixx2,Iyy2,Ixy2)
-	
-	print("--------------------------------------------------")
-	print("Performing the Maximum Supression")
-	#Non Maximum Supression 
-	R=maxSupression(R)
-	R1=maxSupression(R1)
-	
 	##Getting Maximum Value of R
 	firstImgMax=maximumRValue(R)
 	secondImgMax=maximumRValue(R1)
+	tempR=R>int(thres*firstImgMax)
+	tempR1=R1>int(thres*secondImgMax)
+	R=R*tempR
+	R1=R1*tempR1
+	adaptive=0
+	if adaptive==1:
+		anmsinput1=np.where(R>thres*firstImgMax)
+		anmsinput2=np.where(R1>thres*secondImgMax)
+		tempTuple2=AdapativeMeasure(R,anmsinput1,100)
+		tempTuple3=AdapativeMeasure(R1,anmsinput2,100)
+		color_img=visualizing(color_img,tempTuple2)
+		color_img2=visualizing(color_img2,tempTuple3)
+	else:
+		#Non Maximum Supression 
+		R=maxSupression(R)
+		R1=maxSupression(R1)
+		tempTuple2=getKeypoints(img,height,width,R,thres,firstImgMax)
+		tempTuple3=getKeypoints(secondImg,secondHeight,secondwidth,R1,thres,secondImgMax)
+		color_img=visualizing(color_img,tempTuple2)
+		color_img2=visualizing(color_img2,tempTuple3)
 	
-	print("---------------------------------------------------")
-	print("Getting all the Keypoints from the image")
+	
 	##Displaying Images with keypoints
-	tempTuple2,color_img=getKeypoints(img,height,width,R,thres,firstImgMax,color_img)
+	
 	vis = np.concatenate((imgo, color_img), axis=1)
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows();
 	
-	tempTuple3,color_img2=getKeypoints(secondImg,secondHeight,secondwidth,R1,thres,secondImgMax,color_img2)
+	
 	vis = np.concatenate((secondImg1, color_img2), axis=1)
 	cv2.imshow("Test",vis)
 	cv2.waitKey(0)
@@ -335,11 +383,11 @@ def binsContainer(i,j,imarr):
 				bins[7]+=m
 	return bins
 
+	
 '''
 Main Function Takes the First input Image
 '''	
 if __name__=="__main__":
-	print("Starting the Main Function")
 	imgraw=input("imgage Input\n")
 	harrisCornerDetection(cv2.imread(imgraw))
 	
