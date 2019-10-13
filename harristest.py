@@ -156,6 +156,12 @@ def harrisCornerDetection(imgo):
 		firstarray = firstarray / np.linalg.norm(firstarray)
 		secondarray = secondarray / np.linalg.norm(secondarray)
 		print(len(tempTuple),firstarray.shape,len(tempTuple1),secondarray.shape)
+		
+		if(len(tempTuple) == len(tempTuple1)):
+			print("Correct Length ");
+		else:
+			print("Incorrect Lenth");
+		
 		for k in tempTuple:
 			j=0
 			for y in tempTuple1:
