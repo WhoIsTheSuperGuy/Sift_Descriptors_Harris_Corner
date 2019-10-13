@@ -16,6 +16,11 @@ def getGrayImage(img):
 	img=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 	height=img.shape[0]
 	width=img.shape[1]
+	if height  == width :
+		print("Equal size image for finding Descriptors")
+	else:
+		print("Not an Equal Size image for finding Descriptors")
+	
 	return img,height,width
 	
 '''
